@@ -1,0 +1,5 @@
+project_id = "rkobadnotueokcnzbpey"
+
+[functions]
+[functions.sync-time-entries]
+verify_jwt = false

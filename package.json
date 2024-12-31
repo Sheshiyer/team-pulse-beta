@@ -1,0 +1,91 @@
+{
+  "name": "teampulse",
+  "owner": "thoughtseed",
+  "version": "1.0.0",
+  "title": "Teampulse",
+  "description": "Track employee work hours and status",
+  "icon": "icon.png",
+  "author": "mage_narayan",
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "index",
+      "title": "Teampulse",
+      "description": "Track employee work hours and status",
+      "mode": "view",
+      "entry": "src/index.tsx"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "supabaseUrl",
+      "type": "textfield",
+      "required": true,
+      "title": "Supabase URL",
+      "description": "Your Supabase project URL",
+      "default": "https://rkobadnotueokcnzbpey.supabase.co"
+    },
+    {
+      "name": "supabaseAnonKey",
+      "type": "textfield",
+      "required": true,
+      "title": "Supabase Anon Key",
+      "description": "Your Supabase project anonymous key",
+      "default": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrb2JhZG5vdHVlb2tjbnpicGV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1MjAzMTEsImV4cCI6MjA1MTA5NjMxMX0.HnQv4QJi4Y0SgYagys0JISV_8K3N3Q2cdabNtuL_QRM"
+    },
+    {
+      "name": "supabaseServiceRoleKey",
+      "type": "textfield",
+      "required": true,
+      "title": "Supabase Service Role Key",
+      "description": "Your Supabase project service role key",
+      "default": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrb2JhZG5vdHVlb2tjbnpicGV5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNTUyMDMxMSwiZXhwIjoyMDUxMDk2MzExfQ.UhjuapRCIknL89jOpHkrrgqaIDHMwgWFQg3EL_rlNpo"
+    },
+    {
+      "name": "clockifyApiKey",
+      "type": "textfield",
+      "required": true,
+      "title": "Clockify API Key",
+      "description": "Your Clockify API key",
+      "default": "YTkwMjBkOTEtODJjMS00ODA4LWIwMDctYmYzMjdmNTk3NWY0"
+    },
+    {
+      "name": "supabaseFunctionsUrl",
+      "type": "textfield",
+      "required": true,
+      "title": "Supabase Functions URL",
+      "description": "Your Supabase Functions URL (e.g., https://your-project.supabase.co/functions/v1)",
+      "default": "https://rkobadnotueokcnzbpey.supabase.co/functions/v1"
+    }
+  ],
+  "dependencies": {
+    "@googlemaps/google-maps-services-js": "^3.4.0",
+    "@raycast/api": "^1.0.0",
+    "@supabase/supabase-js": "^2.47.10",
+    "axios": "^1.7.9",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.7",
+    "lucide-react": "^0.469.0",
+    "node-geocoder": "^4.4.1",
+    "react": "^18.2.0",
+    "tz-lookup": "^6.1.25"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@raycast/utils": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "@types/node-geocoder": "^4.2.6",
+    "@types/react": "^18.2.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.4.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "sync": "ts-node src/scripts/sync-employees.ts",
+    "setup-db": "ts-node src/scripts/setup-db.ts",
+    "build": "ray build",
+    "dev": "ray develop",
+    "publish": "ray publish"
+  }
+}
