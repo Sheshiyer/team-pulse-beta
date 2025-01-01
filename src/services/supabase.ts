@@ -1,4 +1,4 @@
-import { Employee, DailyLog, TimeEntry } from "../types/clockify";
+import { Employee, TimeEntry } from "../types/supabase";
 import * as supabaseClient from "../lib/supabase/client";
 import { Database } from "../lib/supabase/types";
 import { Json } from "../lib/supabase/types";
@@ -8,18 +8,8 @@ import dotenv from "dotenv";
 dotenv.config();
 const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
 
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-}
-
-interface EmployeeCache {
-  [key: string]: CacheEntry<Employee>;
-}
-
 export class SupabaseService {
   private static instance: SupabaseService;
-  private employeeCache: EmployeeCache = {};
 
   private constructor() {}
 
@@ -30,104 +20,36 @@ export class SupabaseService {
     return SupabaseService.instance;
   }
 
-  private isCacheValid<T>(cacheEntry: CacheEntry<T>): boolean {
-    return Date.now() - cacheEntry.timestamp < CACHE_DURATION;
-  }
-
-  private convertStoredLogsToDailyLogs(logs: unknown): DailyLog[] {
-    if (!Array.isArray(logs)) return [];
-
-    return logs
-      .map((log) => {
-        if (typeof log !== "object" || !log) return null;
-        const typedLog = log as {
-          date: string;
-          loginTime: string;
-          logoutTime: string;
-        };
-        if (
-          typeof typedLog.date !== "string" ||
-          typeof typedLog.loginTime !== "string" ||
-          typeof typedLog.logoutTime !== "string"
-        ) {
-          return null;
-        }
-
-        return {
-          date: new Date(typedLog.date),
-          loginTime: new Date(typedLog.loginTime),
-          logoutTime: new Date(typedLog.logoutTime),
-        };
-      })
-      .filter((log): log is DailyLog => log !== null);
-  }
-
-  private convertDailyLogsToJson(logs: DailyLog[]): Json {
-    return logs.map((log) => ({
-      date: log.date.toISOString(),
-      loginTime: log.loginTime.toISOString(),
-      logoutTime: log.logoutTime.toISOString(),
-    }));
-  }
-
   async getEmployees(): Promise<Employee[]> {
     try {
       const employees = await supabaseClient.getEmployees();
-      return employees.map((emp) => this.mapDatabaseToEmployee(emp));
+      return employees.map((emp) => ({
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        isActive: emp.is_active,
+        group: emp.group || undefined,
+        employeeType: emp.employee_type || "fulltime",
+      }));
     } catch (error) {
       console.error("Error fetching employees:", error);
       throw error;
     }
   }
 
-  private mapDatabaseToEmployee(
-    emp: Database["public"]["Tables"]["employees"]["Row"],
-  ): Employee {
-    return {
-      id: emp.id,
-      name: emp.name,
-      email: emp.email,
-      isActive: emp.is_active,
-      group: emp.group || undefined,
-      weeklyLogs: this.convertStoredLogsToDailyLogs(emp.weekly_logs),
-      employeeType: emp.employee_type || undefined,
-      customDetails: {
-        dateOfBirth: emp.birth_date || undefined,
-        timeOfBirth: emp.birth_time || undefined,
-        humanDesignType: emp.hd_type || undefined,
-        profile: emp.hd_profile ? JSON.stringify(emp.hd_profile) : undefined,
-        incarnationCross: emp.hd_incarnation_cross || undefined,
-        location:
-          (emp.birth_location as {
-            address: string;
-            latitude: number;
-            longitude: number;
-            timezone: string;
-          }) || undefined,
-      },
-    };
-  }
-
   async getEmployee(id: string): Promise<Employee | null> {
-    // Check cache first
-    const cachedEntry = this.employeeCache[id];
-    if (cachedEntry && this.isCacheValid(cachedEntry)) {
-      return cachedEntry.data;
-    }
-
     try {
       const employee = await supabaseClient.getEmployee(id);
       if (!employee) return null;
 
-      const formattedEmployee = this.mapDatabaseToEmployee(employee);
-
-      // Cache the result
-      this.employeeCache[id] = {
-        data: formattedEmployee,
-        timestamp: Date.now(),
+      return {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        isActive: employee.is_active,
+        group: employee.group || undefined,
+        employeeType: employee.employee_type || "fulltime",
       };
-
-      return formattedEmployee;
     } catch (error) {
       console.error("Error fetching employee:", error);
       throw error;
@@ -141,23 +63,8 @@ export class SupabaseService {
         email: employee.email,
         is_active: employee.isActive,
         group: employee.group,
-        weekly_logs: this.convertDailyLogsToJson(employee.weeklyLogs),
         employee_type: employee.employeeType,
-        birth_date: employee.customDetails?.dateOfBirth,
-        birth_time: employee.customDetails?.timeOfBirth,
-        hd_type: employee.customDetails?.humanDesignType,
-        hd_profile: employee.customDetails?.profile
-          ? JSON.parse(employee.customDetails.profile)
-          : null,
-        hd_incarnation_cross: employee.customDetails?.incarnationCross,
-        birth_location: employee.customDetails?.location || null,
       });
-
-      // Update cache
-      this.employeeCache[employee.id] = {
-        data: employee,
-        timestamp: Date.now(),
-      };
     } catch (error) {
       console.error("Error updating employee:", error);
       throw error;
@@ -171,53 +78,21 @@ export class SupabaseService {
         email: employee.email,
         is_active: employee.isActive,
         group: employee.group,
-        weekly_logs: this.convertDailyLogsToJson(employee.weeklyLogs),
         employee_type: employee.employeeType,
-        birth_date: employee.customDetails?.dateOfBirth,
-        birth_time: employee.customDetails?.timeOfBirth,
-        hd_type: employee.customDetails?.humanDesignType,
-        hd_profile: employee.customDetails?.profile
-          ? JSON.parse(employee.customDetails.profile)
-          : null,
-        hd_incarnation_cross: employee.customDetails?.incarnationCross,
-        birth_location: employee.customDetails?.location || null,
       });
 
-      const newEmployee = this.mapDatabaseToEmployee(data);
-
-      // Cache the new employee
-      this.employeeCache[data.id] = {
-        data: newEmployee,
-        timestamp: Date.now(),
+      return {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        isActive: data.is_active,
+        group: data.group || undefined,
+        employeeType: data.employee_type || "fulltime",
       };
-
-      return newEmployee;
     } catch (error) {
       console.error("Error creating employee:", error);
       throw error;
     }
-  }
-
-  async updateDailyLogs(employeeId: string, logs: DailyLog[]): Promise<void> {
-    try {
-      await supabaseClient.updateEmployee(employeeId, {
-        weekly_logs: this.convertDailyLogsToJson(logs),
-      });
-
-      // Update cache if it exists
-      const cachedEntry = this.employeeCache[employeeId];
-      if (cachedEntry) {
-        cachedEntry.data.weeklyLogs = logs;
-        cachedEntry.timestamp = Date.now();
-      }
-    } catch (error) {
-      console.error("Error updating daily logs:", error);
-      throw error;
-    }
-  }
-
-  clearCache(): void {
-    this.employeeCache = {};
   }
 
   async getTimeEntries(
@@ -226,12 +101,11 @@ export class SupabaseService {
     endDate?: string,
   ): Promise<TimeEntry[]> {
     try {
-      const entries = await supabaseClient.getTimeEntriesForEmployee(
+      return await supabaseClient.getTimeEntriesForEmployee(
         employeeId,
         startDate,
         endDate,
       );
-      return entries;
     } catch (error) {
       console.error("Error fetching time entries:", error);
       throw error;
@@ -245,40 +119,5 @@ export class SupabaseService {
       console.error("Error fetching active time entry:", error);
       throw error;
     }
-  }
-
-  async getWeeklyTimeEntries(employeeId: string): Promise<TimeEntry[]> {
-    const now = new Date();
-    const startOfWeek = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() - now.getDay(),
-    );
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const endOfWeek = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() + (6 - now.getDay()),
-    );
-    endOfWeek.setHours(23, 59, 59, 999);
-
-    return this.getTimeEntries(
-      employeeId,
-      startOfWeek.toISOString(),
-      endOfWeek.toISOString(),
-    );
-  }
-
-  async getMonthlyTimeEntries(employeeId: string): Promise<TimeEntry[]> {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-    return this.getTimeEntries(
-      employeeId,
-      startOfMonth.toISOString(),
-      endOfMonth.toISOString(),
-    );
   }
 }

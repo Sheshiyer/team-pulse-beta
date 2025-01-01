@@ -9,15 +9,15 @@ import {
   LocalStorage,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
-import { Employee, TimeEntry } from "./types/clockify";
+import { Employee, TimeEntry } from "./types/supabase";
 import { TimeEntriesService } from "./services/timeEntries";
 import { EmployeeDetail } from "./components/EmployeeDetail";
 import { EditEmployeeForm } from "./components/EditEmployeeForm";
 import {
-  calculateTotalDuration,
   formatDuration,
-  getRecommendedMonthlyHours,
-} from "./utils/biorhythm";
+  calculateTotalHours,
+  getExpectedMonthlyHours,
+} from "./utils/time";
 import { getAllStoredEmployeeDetails } from "./utils/storage";
 import * as supabaseClient from "./lib/supabase/client";
 
@@ -132,8 +132,7 @@ export default function Command(): JSX.Element {
             email: emp.email || "",
             isActive: activeEntry !== null,
             group: emp.group || "No Group",
-            weeklyLogs: [],
-            customDetails: storedEmployeeDetails,
+            employeeType: emp.employeeType || "fulltime",
           };
         }),
       );
@@ -217,15 +216,14 @@ export default function Command(): JSX.Element {
             const activeEntry = await supabaseClient.getActiveTimeEntry(emp.id);
             const storedEmployeeDetails = storedDetails[emp.id];
 
-            return {
-              id: emp.id,
-              name: emp.name || "Unknown Employee",
-              email: emp.email || "",
-              isActive: activeEntry !== null,
-              group: emp.group || "No Group",
-              weeklyLogs: [],
-              customDetails: storedEmployeeDetails,
-            };
+              return {
+                id: emp.id,
+                name: emp.name || "Unknown Employee",
+                email: emp.email || "",
+                isActive: activeEntry !== null,
+                group: emp.group || "No Group",
+                employeeType: emp.employeeType || "fulltime",
+              };
           }),
         );
 
@@ -373,7 +371,8 @@ export default function Command(): JSX.Element {
           })
           .map((employee: Employee) => {
             const entries = weeklyEntries[employee.id] || [];
-            const weeklyDuration = calculateTotalDuration(entries);
+            const weeklyHours = entries.reduce((total, entry) => 
+              total + calculateTotalHours(entry.duration), 0);
 
             return (
               <List.Item
@@ -397,7 +396,7 @@ export default function Command(): JSX.Element {
                     },
                   },
                   {
-                    text: `${formatDuration(calculateTotalDuration(monthlyEntries[employee.id] || []))} / ${formatDuration(getRecommendedMonthlyHours() * 60)}`,
+                    text: `${formatDuration(monthlyEntries[employee.id]?.[0]?.duration || "PT0H0M")} / ${getExpectedMonthlyHours()}h`,
                     tooltip: "Monthly hours / Recommended hours",
                   },
                 ]}
@@ -408,40 +407,6 @@ export default function Command(): JSX.Element {
                         title="View Details"
                         icon={Icon.Eye}
                         target={<EmployeeDetail employee={employee} />}
-                      />
-                      <Action
-                        title="Sync Time Entries"
-                        icon={Icon.Upload}
-                        shortcut={{ modifiers: ["cmd"], key: "s" }}
-                        onAction={async () => {
-                          try {
-                            await showToast({
-                              style: Toast.Style.Animated,
-                              title: "Syncing time entries...",
-                            });
-
-                            const timeEntriesService =
-                              TimeEntriesService.getInstance();
-                            await timeEntriesService.syncTimeEntries(
-                              employee.id,
-                              employee.id,
-                            );
-
-                            await showToast({
-                              style: Toast.Style.Success,
-                              title: "Time entries synced successfully",
-                            });
-                          } catch (error) {
-                            await showToast({
-                              style: Toast.Style.Failure,
-                              title: "Failed to sync time entries",
-                              message:
-                                error instanceof Error
-                                  ? error.message
-                                  : "Unknown error",
-                            });
-                          }
-                        }}
                       />
                       <Action
                         title="Refresh Data"
@@ -461,7 +426,7 @@ export default function Command(): JSX.Element {
                       />
                       <Action.CopyToClipboard
                         title="Copy Status"
-                        content={`${employee.name} - ${formatDuration(weeklyDuration)} this week`}
+                        content={`${employee.name} - ${weeklyHours.toFixed(1)}h this week`}
                       />
                     </ActionPanel.Section>
                   </ActionPanel>

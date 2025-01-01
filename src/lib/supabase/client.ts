@@ -95,34 +95,46 @@ export const deleteEmployee = async (id: string) => {
 
 // Export the regular client for user-level operations
 // Time entries operations
-export const upsertTimeEntry = async (
-  timeEntry: Database["public"]["Tables"]["time_entries"]["Insert"],
-) => {
+export const upsertTimeEntry = async (timeEntry: TimeEntry) => {
   const { data: existingEntry } = await supabaseAdmin
     .from("time_entries")
     .select()
-    .eq("clockify_entry_id", timeEntry.clockify_entry_id)
+    .eq("id", timeEntry.id)
     .single();
 
   if (existingEntry) {
     const { error } = await supabaseAdmin
       .from("time_entries")
-      .update(timeEntry)
-      .eq("clockify_entry_id", timeEntry.clockify_entry_id);
+      .update({
+        employee_id: timeEntry.employee_id,
+        description: timeEntry.description,
+        start_time: timeEntry.start_time,
+        end_time: timeEntry.end_time,
+        duration: timeEntry.duration,
+        billable: timeEntry.billable,
+      })
+      .eq("id", timeEntry.id);
 
     if (error) throw error;
   } else {
     const { error } = await supabaseAdmin
       .from("time_entries")
-      .insert([timeEntry]);
+      .insert([{
+        id: timeEntry.id,
+        employee_id: timeEntry.employee_id,
+        description: timeEntry.description,
+        start_time: timeEntry.start_time,
+        end_time: timeEntry.end_time,
+        duration: timeEntry.duration,
+        billable: timeEntry.billable,
+      }]);
 
     if (error) throw error;
   }
 };
 
 // Time entries operations
-import { adaptTimeEntry } from "../../types/supabase";
-import { TimeEntry } from "../../types/clockify";
+import { TimeEntry } from "../../types/supabase";
 
 export const getTimeEntriesForEmployee = async (
   employeeId: string,
@@ -145,8 +157,7 @@ export const getTimeEntriesForEmployee = async (
   const { data, error } = await query;
   if (error) throw error;
 
-  // Convert Supabase time entries to Clockify format
-  return data ? data.map(adaptTimeEntry) : [];
+  return data || [];
 };
 
 export const getActiveTimeEntry = async (
@@ -160,7 +171,7 @@ export const getActiveTimeEntry = async (
     .single();
 
   if (error && error.code !== "PGRST116") throw error; // PGRST116 is "no rows returned"
-  return data ? adaptTimeEntry(data) : null;
+  return data || null;
 };
 
 export const supabase = supabaseClient;

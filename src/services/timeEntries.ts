@@ -1,17 +1,10 @@
-import { ClockifyService } from "./clockify";
-import { SupabaseService } from "./supabase";
-import { TimeEntry } from "../types/clockify";
+import { TimeEntry, CreateTimeEntry, UpdateTimeEntry } from "../types/supabase";
 import * as supabaseClient from "../lib/supabase/client";
 
 export class TimeEntriesService {
   private static instance: TimeEntriesService;
-  private clockifyService: ClockifyService;
-  private supabaseService: SupabaseService;
 
-  private constructor() {
-    this.clockifyService = ClockifyService.getInstance();
-    this.supabaseService = SupabaseService.getInstance();
-  }
+  private constructor() {}
 
   static getInstance(): TimeEntriesService {
     if (!TimeEntriesService.instance) {
@@ -20,65 +13,61 @@ export class TimeEntriesService {
     return TimeEntriesService.instance;
   }
 
-  async syncTimeEntries(
+  async getTimeEntries(
     employeeId: string,
-    clockifyUserId: string,
-  ): Promise<void> {
+    startDate?: string,
+    endDate?: string
+  ): Promise<TimeEntry[]> {
     try {
-      console.log(`Syncing time entries for employee ${employeeId}`);
-
-      // Get time entries from Clockify
-      const timeEntries =
-        await this.clockifyService.getWeeklyTimeEntries(clockifyUserId);
-
-      for (const entry of timeEntries) {
-        await this.upsertTimeEntry(employeeId, entry);
-      }
-
-      console.log(`Successfully synced ${timeEntries.length} time entries`);
+      return await supabaseClient.getTimeEntriesForEmployee(
+        employeeId,
+        startDate,
+        endDate
+      );
     } catch (error) {
-      console.error("Error syncing time entries:", error);
+      console.error("Error getting time entries:", error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to get time entries: ${error.message}`);
+      }
       throw error;
     }
   }
 
-  private async upsertTimeEntry(
-    employeeId: string,
-    entry: TimeEntry,
-  ): Promise<void> {
-    const timeEntry = {
-      employee_id: employeeId,
-      clockify_entry_id: entry.id,
-      description: entry.description,
-      start_time: entry.timeInterval.start,
-      end_time: entry.timeInterval.end || null,
-      duration: entry.timeInterval.duration,
-      billable: entry.billable,
-    };
+  async getActiveTimeEntry(employeeId: string): Promise<TimeEntry | null> {
+    try {
+      return await supabaseClient.getActiveTimeEntry(employeeId);
+    } catch (error) {
+      console.error("Error getting active time entry:", error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to get active time entry: ${error.message}`);
+      }
+      throw error;
+    }
+  }
 
+  async createTimeEntry(timeEntry: CreateTimeEntry): Promise<void> {
+    try {
+      await supabaseClient.upsertTimeEntry({
+        ...timeEntry,
+        id: crypto.randomUUID(), // Generate a new UUID for new entries
+      });
+    } catch (error) {
+      console.error("Error creating time entry:", error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to create time entry: ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async updateTimeEntry(timeEntry: UpdateTimeEntry): Promise<void> {
     try {
       await supabaseClient.upsertTimeEntry(timeEntry);
     } catch (error) {
-      console.error(`Error upserting time entry ${entry.id}:`, error);
-      throw error;
-    }
-  }
-
-  async syncAllEmployeesTimeEntries(): Promise<void> {
-    try {
-      const employees = await supabaseClient.getEmployees();
-
-      if (!employees || employees.length === 0) {
-        throw new Error("No active employees found");
+      console.error("Error updating time entry:", error);
+      if (error instanceof Error) {
+        throw new Error(`Failed to update time entry: ${error.message}`);
       }
-
-      for (const employee of employees) {
-        if (employee.clockify_id) {
-          await this.syncTimeEntries(employee.id, employee.clockify_id);
-        }
-      }
-    } catch (error) {
-      console.error("Error syncing all employees time entries:", error);
       throw error;
     }
   }

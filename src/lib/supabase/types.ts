@@ -13,7 +13,6 @@ export interface Database {
         Row: {
           id: string;
           employee_id: string;
-          clockify_entry_id: string;
           description: string | null;
           start_time: string;
           end_time: string | null;
@@ -25,7 +24,6 @@ export interface Database {
         Insert: {
           id?: string;
           employee_id: string;
-          clockify_entry_id: string;
           description?: string | null;
           start_time: string;
           end_time?: string | null;
@@ -37,7 +35,6 @@ export interface Database {
         Update: {
           id?: string;
           employee_id?: string;
-          clockify_entry_id?: string;
           description?: string | null;
           start_time?: string;
           end_time?: string | null;
@@ -49,37 +46,12 @@ export interface Database {
       };
       employees: {
         Row: {
-          // Core fields
           id: string;
           name: string;
           email: string;
           is_active: boolean;
           employee_type: "intern" | "fulltime" | "consultant" | null;
           group: string | null;
-
-          // Clockify integration
-          clockify_id: string | null;
-          weekly_logs: Json | null;
-          active_workspace: string | null;
-          default_workspace: string | null;
-          status: string | null;
-          profile_picture: string | null;
-
-          // Human Design fields
-          birth_date: string | null;
-          birth_time: string | null;
-          birth_location: Json | null;
-          hd_type: string | null;
-          hd_authority: string | null;
-          hd_profile: Json | null;
-          hd_centers: Json | null;
-          hd_gates: Json | null;
-          hd_channels: Json | null;
-          hd_definition: string | null;
-          hd_incarnation_cross: string | null;
-          hd_variables: Json | null;
-
-          // Metadata
           created_at: string;
           updated_at: string;
         };
@@ -90,24 +62,6 @@ export interface Database {
           is_active?: boolean;
           employee_type?: "intern" | "fulltime" | "consultant" | null;
           group?: string | null;
-          clockify_id?: string | null;
-          weekly_logs?: Json | null;
-          active_workspace?: string | null;
-          default_workspace?: string | null;
-          status?: string | null;
-          profile_picture?: string | null;
-          birth_date?: string | null;
-          birth_time?: string | null;
-          birth_location?: Json | null;
-          hd_type?: string | null;
-          hd_authority?: string | null;
-          hd_profile?: Json | null;
-          hd_centers?: Json | null;
-          hd_gates?: Json | null;
-          hd_channels?: Json | null;
-          hd_definition?: string | null;
-          hd_incarnation_cross?: string | null;
-          hd_variables?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -118,24 +72,6 @@ export interface Database {
           is_active?: boolean;
           employee_type?: "intern" | "fulltime" | "consultant" | null;
           group?: string | null;
-          clockify_id?: string | null;
-          weekly_logs?: Json | null;
-          active_workspace?: string | null;
-          default_workspace?: string | null;
-          status?: string | null;
-          profile_picture?: string | null;
-          birth_date?: string | null;
-          birth_time?: string | null;
-          birth_location?: Json | null;
-          hd_type?: string | null;
-          hd_authority?: string | null;
-          hd_profile?: Json | null;
-          hd_centers?: Json | null;
-          hd_gates?: Json | null;
-          hd_channels?: Json | null;
-          hd_definition?: string | null;
-          hd_incarnation_cross?: string | null;
-          hd_variables?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
