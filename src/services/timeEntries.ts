@@ -75,23 +75,4 @@ export class TimeEntriesService {
       throw error;
     }
   }
-      const { data: employees } = await this.supabaseService.client
-        .from('employees')
-        .select('id, clockify_id')
-        .eq('is_active', true);
-
-      if (!employees) {
-        throw new Error('No active employees found');
-      }
-
-      for (const employee of employees) {
-        if (employee.clockify_id) {
-          await this.syncTimeEntries(employee.id, employee.clockify_id);
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing all employees time entries:', error);
-      throw error;
-    }
-  }
 }

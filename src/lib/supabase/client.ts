@@ -1,19 +1,32 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './types';
-import { getPreferenceValues } from "@raycast/api";
 
-interface Preferences {
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-  supabaseServiceRoleKey: string;
+let supabaseUrl: string;
+let supabaseAnonKey: string;
+let supabaseServiceRoleKey: string;
+
+try {
+  // Try to get values from Raycast preferences
+  const raycast = require("@raycast/api");
+  const preferences = raycast.getPreferenceValues();
+  supabaseUrl = preferences.supabaseUrl;
+  supabaseAnonKey = preferences.supabaseAnonKey;
+  supabaseServiceRoleKey = preferences.supabaseServiceRoleKey;
+} catch (error) {
+  // Fallback to environment variables
+  supabaseUrl = process.env.SUPABASE_URL || '';
+  supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+  supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 }
 
-const preferences = getPreferenceValues<Preferences>();
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+  throw new Error('Missing Supabase configuration. Set environment variables or Raycast preferences.');
+}
 
 // Create clients for different auth levels
 const supabaseAdmin = createClient<Database>(
-  preferences.supabaseUrl,
-  preferences.supabaseServiceRoleKey,
+  supabaseUrl,
+  supabaseServiceRoleKey,
   {
     auth: {
       persistSession: false
@@ -22,11 +35,11 @@ const supabaseAdmin = createClient<Database>(
 );
 
 const supabaseClient = createClient<Database>(
-  preferences.supabaseUrl,
-  preferences.supabaseAnonKey,
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
-      persistSession: false // Since this is a Raycast extension
+      persistSession: false
     }
   }
 );
