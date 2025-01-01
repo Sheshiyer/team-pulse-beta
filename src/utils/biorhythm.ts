@@ -57,26 +57,47 @@ export function getRecommendedMonthlyHours(): number {
 }
 
 export function calculateTotalDuration(
-  timeEntries: { timeInterval: { duration: string } }[],
+  timeEntries: Array<{ timeInterval?: { duration: string }, duration?: string }>,
 ): number {
   return timeEntries.reduce((total, entry) => {
-    if (!entry.timeInterval?.duration) return total;
+    // Handle Supabase format (direct duration string)
+    if (entry.duration) {
+      try {
+        // Handle "PT1H30M" format
+        if (entry.duration.startsWith("PT")) {
+          const hours = entry.duration.match(/(\d+)H/)?.[1] || "0";
+          const minutes = entry.duration.match(/(\d+)M/)?.[1] || "0";
+          return total + (parseInt(hours) * 60 + parseInt(minutes));
+        }
 
-    try {
-      // Handle "PT1H30M" format
-      if (entry.timeInterval.duration.startsWith("PT")) {
-        const hours = entry.timeInterval.duration.match(/(\d+)H/)?.[1] || "0";
-        const minutes = entry.timeInterval.duration.match(/(\d+)M/)?.[1] || "0";
+        // Handle "HH:mm:ss" format
+        const [hours = "0", minutes = "0"] = entry.duration.split(":");
         return total + (parseInt(hours) * 60 + parseInt(minutes));
+      } catch (error) {
+        console.error("Error parsing duration:", error);
+        return total;
       }
-
-      // Handle "HH:mm:ss" format
-      const [hours = "0", minutes = "0"] =
-        entry.timeInterval.duration.split(":");
-      return total + (parseInt(hours) * 60 + parseInt(minutes));
-    } catch (error) {
-      console.error("Error parsing duration:", error);
-      return total;
     }
+
+    // Handle Clockify format (timeInterval.duration)
+    if (entry.timeInterval?.duration) {
+      try {
+        // Handle "PT1H30M" format
+        if (entry.timeInterval.duration.startsWith("PT")) {
+          const hours = entry.timeInterval.duration.match(/(\d+)H/)?.[1] || "0";
+          const minutes = entry.timeInterval.duration.match(/(\d+)M/)?.[1] || "0";
+          return total + (parseInt(hours) * 60 + parseInt(minutes));
+        }
+
+        // Handle "HH:mm:ss" format
+        const [hours = "0", minutes = "0"] = entry.timeInterval.duration.split(":");
+        return total + (parseInt(hours) * 60 + parseInt(minutes));
+      } catch (error) {
+        console.error("Error parsing duration:", error);
+        return total;
+      }
+    }
+
+    return total;
   }, 0);
 }

@@ -120,7 +120,10 @@ export const upsertTimeEntry = async (timeEntry: Database['public']['Tables']['t
 };
 
 // Time entries operations
-export const getTimeEntriesForEmployee = async (employeeId: string, startDate?: string, endDate?: string) => {
+import { adaptTimeEntry } from '../../types/supabase';
+import { TimeEntry } from '../../types/clockify';
+
+export const getTimeEntriesForEmployee = async (employeeId: string, startDate?: string, endDate?: string): Promise<TimeEntry[]> => {
   let query = supabaseAdmin
     .from('time_entries')
     .select('*')
@@ -136,10 +139,12 @@ export const getTimeEntriesForEmployee = async (employeeId: string, startDate?: 
 
   const { data, error } = await query;
   if (error) throw error;
-  return data;
+  
+  // Convert Supabase time entries to Clockify format
+  return data ? data.map(adaptTimeEntry) : [];
 };
 
-export const getActiveTimeEntry = async (employeeId: string) => {
+export const getActiveTimeEntry = async (employeeId: string): Promise<TimeEntry | null> => {
   const { data, error } = await supabaseAdmin
     .from('time_entries')
     .select('*')
@@ -148,7 +153,7 @@ export const getActiveTimeEntry = async (employeeId: string) => {
     .single();
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
-  return data || null;
+  return data ? adaptTimeEntry(data) : null;
 };
 
 export const supabase = supabaseClient;

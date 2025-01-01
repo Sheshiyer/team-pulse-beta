@@ -11,7 +11,6 @@ import {
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { Employee, TimeEntry } from "./types/clockify";
-import { ClockifyService } from "./services/clockify";
 import { TimeEntriesService } from "./services/timeEntries";
 import { EmployeeDetail } from "./components/EmployeeDetail";
 import { EditEmployeeForm } from "./components/EditEmployeeForm";
@@ -21,96 +20,142 @@ import {
   getRecommendedMonthlyHours,
 } from "./utils/biorhythm";
 import { getAllStoredEmployeeDetails } from "./utils/storage";
+import * as supabaseClient from "./lib/supabase/client";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+interface TimeEntriesCache {
+  [key: string]: {
+    weekly: TimeEntry[];
+    monthly: TimeEntry[];
+  };
+}
 
 export default function Command(): JSX.Element {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [weeklyEntries, setWeeklyEntries] = useState<
-    Record<string, TimeEntry[]>
-  >({});
-  const [monthlyEntries, setMonthlyEntries] = useState<
-    Record<string, TimeEntry[]>
-  >({});
+  const [weeklyEntries, setWeeklyEntries] = useState<Record<string, TimeEntry[]>>({});
+  const [monthlyEntries, setMonthlyEntries] = useState<Record<string, TimeEntry[]>>({});
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Cache helper functions
+  async function getCachedData<T>(key: string): Promise<T | null> {
+    const cached = await LocalStorage.getItem<string>(key);
+    if (!cached) return null;
+
+    const { data, timestamp }: CacheEntry<T> = JSON.parse(cached);
+    if (Date.now() - timestamp > CACHE_TTL) {
+      await LocalStorage.removeItem(key);
+      return null;
+    }
+
+    return data;
+  }
+
+  async function setCachedData<T>(key: string, data: T): Promise<void> {
+    const cacheEntry: CacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+    };
+    await LocalStorage.setItem(key, JSON.stringify(cacheEntry));
+  }
+
+  // Function to get time entries for a date range
+  async function getTimeEntriesForRange(employeeId: string, startDate: string, endDate: string, type: 'weekly' | 'monthly') {
+    const cacheKey = "time_entries_cache";
+    const cached = await getCachedData<TimeEntriesCache>(cacheKey);
+    
+    if (cached && cached[employeeId] && cached[employeeId][type]) {
+      return cached[employeeId][type];
+    }
+
+    const entries = await supabaseClient.getTimeEntriesForEmployee(employeeId, startDate, endDate);
+    
+    // Update cache
+    const newCache: TimeEntriesCache = cached || {};
+    if (!newCache[employeeId]) {
+      newCache[employeeId] = { weekly: [], monthly: [] };
+    }
+    newCache[employeeId][type] = entries;
+    await setCachedData(cacheKey, newCache);
+    
+    return entries;
+  }
 
   // Function to clear cache and refresh data
   async function handleRefresh() {
     try {
       setIsLoading(true);
-      // Only clear specific caches if needed, preserve employee details
-      // await LocalStorage.clear(); // Removed complete clear
+      
+      // Clear time entries cache
+      await LocalStorage.removeItem("time_entries_cache");
       
       // Reset states
-      setEmployees([]);
       setWeeklyEntries({});
       setMonthlyEntries({});
 
-      // Refetch all data
-      const clockify = ClockifyService.getInstance();
-      const workspaces = await clockify.getWorkspaces();
-      await clockify.setActiveWorkspace(workspaces[0].id);
-
-      const [users, groups] = await Promise.all([
-        clockify.getUsers(),
-        clockify.getUserGroups(),
-      ]);
-
-      // Map users to employees and check active timers
-      const employeeList: Employee[] = await Promise.all(
-        users
-          .filter((user) => user.name)
-          .map(async (user) => {
-            const userGroup = groups.find((group) =>
-              group.userIds.includes(user.id),
-            );
-            const activeEntry = await clockify.getActiveTimeEntry(user.id);
-
-            // Get stored details to preserve location data
-            const storedData = await LocalStorage.getItem<string>("employee_details");
-            const storedDetails = storedData ? JSON.parse(storedData) : {};
-            const employeeDetails = storedDetails[user.id] || {};
-
-            return {
-              id: user.id,
-              name: user.name || "Unknown Employee",
-              email: user.email || "",
-              isActive: activeEntry !== null,
-              group: userGroup?.name,
-              weeklyLogs: [],
-              customDetails: {
-                ...employeeDetails,
-                location: employeeDetails.location
-              },
-            };
-          }),
-      );
-
-      if (employeeList.length === 0) {
-        throw new Error("No employees found in Clockify workspace");
+      // Fetch employees from Supabase
+      const employeeList = await supabaseClient.getEmployees();
+      if (!employeeList || employeeList.length === 0) {
+        throw new Error("No employees found in database");
       }
 
-      setEmployees(employeeList);
+      // Load stored employee details
+      const storedDetails = await getAllStoredEmployeeDetails();
 
-      // Fetch entries with delay to avoid rate limits
+      // Map employees and check active timers
+      const mappedEmployees = await Promise.all(
+        employeeList.map(async (emp) => {
+          const activeEntry = await supabaseClient.getActiveTimeEntry(emp.id);
+          const storedEmployeeDetails = storedDetails[emp.id];
+
+          return {
+            id: emp.id,
+            name: emp.name || "Unknown Employee",
+            email: emp.email || "",
+            isActive: activeEntry !== null,
+            group: emp.group || "No Group",
+            weeklyLogs: [],
+            customDetails: storedEmployeeDetails,
+          };
+        })
+      );
+
+      setEmployees(mappedEmployees);
+
+      // Fetch time entries for each employee
       const weeklyEntriesMap: Record<string, TimeEntry[]> = {};
       const monthlyEntriesMap: Record<string, TimeEntry[]> = {};
 
-      for (const employee of employeeList) {
+      const now = new Date();
+      const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      for (const employee of mappedEmployees) {
         try {
           const [weekly, monthly] = await Promise.all([
-            clockify.getWeeklyTimeEntries(employee.id),
-            clockify.getMonthlyTimeEntries(employee.id),
+            getTimeEntriesForRange(
+              employee.id,
+              weekStart.toISOString(),
+              new Date().toISOString(),
+              'weekly'
+            ),
+            getTimeEntriesForRange(
+              employee.id,
+              monthStart.toISOString(),
+              new Date().toISOString(),
+              'monthly'
+            ),
           ]);
           weeklyEntriesMap[employee.id] = weekly;
           monthlyEntriesMap[employee.id] = monthly;
-
-          // Add delay between batches to avoid rate limits
-          await new Promise((resolve) => setTimeout(resolve, 1000));
         } catch (error) {
-          console.error(
-            `Error fetching entries for ${employee.name}:`,
-            error,
-          );
+          console.error(`Error fetching entries for ${employee.name}:`, error);
           weeklyEntriesMap[employee.id] = [];
           monthlyEntriesMap[employee.id] = [];
         }
@@ -138,69 +183,72 @@ export default function Command(): JSX.Element {
   useEffect(() => {
     async function fetchData() {
       try {
-        const clockify = ClockifyService.getInstance();
-        const workspaces = await clockify.getWorkspaces();
-        await clockify.setActiveWorkspace(workspaces[0].id);
+        // Try to get cached employees first
+        const cachedEmployees = await getCachedData<Employee[]>("employees");
+        if (cachedEmployees) {
+          setEmployees(cachedEmployees);
+          setIsLoading(false);
+        }
 
-        const [users, groups] = await Promise.all([
-          clockify.getUsers(),
-          clockify.getUserGroups(),
-        ]);
+        // Fetch fresh data
+        const employeeList = await supabaseClient.getEmployees();
+        if (!employeeList || employeeList.length === 0) {
+          throw new Error("No employees found in database");
+        }
 
         // Load stored employee details
         const storedDetails = await getAllStoredEmployeeDetails();
 
-        // Map users to employees and check active timers
-        const employeeList: Employee[] = await Promise.all(
-          users
-            .filter((user) => user.name)
-            .map(async (user) => {
-              const userGroup = groups.find((group) =>
-                group.userIds.includes(user.id),
-              );
-              const storedEmployeeDetails = storedDetails[user.id];
+        // Map employees and check active timers
+        const mappedEmployees = await Promise.all(
+          employeeList.map(async (emp) => {
+            const activeEntry = await supabaseClient.getActiveTimeEntry(emp.id);
+            const storedEmployeeDetails = storedDetails[emp.id];
 
-              // Check for active timer
-              const activeEntry = await clockify.getActiveTimeEntry(user.id);
-
-              return {
-                id: user.id,
-                name: user.name || "Unknown Employee",
-                email: user.email || "",
-                isActive: activeEntry !== null, // Set active based on running timer
-                group: userGroup?.name,
-                weeklyLogs: [],
-                customDetails: storedEmployeeDetails,
-              };
-            }),
+            return {
+              id: emp.id,
+              name: emp.name || "Unknown Employee",
+              email: emp.email || "",
+              isActive: activeEntry !== null,
+              group: emp.group || "No Group",
+              weeklyLogs: [],
+              customDetails: storedEmployeeDetails,
+            };
+          })
         );
 
-        if (employeeList.length === 0) {
-          throw new Error("No employees found in Clockify workspace");
-        }
+        // Cache the employees data
+        await setCachedData("employees", mappedEmployees);
+        setEmployees(mappedEmployees);
 
-        setEmployees(employeeList);
-
-        // Fetch entries with delay to avoid rate limits
+        // Fetch time entries for each employee
         const weeklyEntriesMap: Record<string, TimeEntry[]> = {};
         const monthlyEntriesMap: Record<string, TimeEntry[]> = {};
 
-        for (const employee of employeeList) {
+        const now = new Date();
+        const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        for (const employee of mappedEmployees) {
           try {
             const [weekly, monthly] = await Promise.all([
-              clockify.getWeeklyTimeEntries(employee.id),
-              clockify.getMonthlyTimeEntries(employee.id),
+              getTimeEntriesForRange(
+                employee.id,
+                weekStart.toISOString(),
+                new Date().toISOString(),
+                'weekly'
+              ),
+              getTimeEntriesForRange(
+                employee.id,
+                monthStart.toISOString(),
+                new Date().toISOString(),
+                'monthly'
+              ),
             ]);
             weeklyEntriesMap[employee.id] = weekly;
             monthlyEntriesMap[employee.id] = monthly;
-
-            // Add delay between batches to avoid rate limits
-            await new Promise((resolve) => setTimeout(resolve, 1000));
           } catch (error) {
-            console.error(
-              `Error fetching entries for ${employee.name}:`,
-              error,
-            );
+            console.error(`Error fetching entries for ${employee.name}:`, error);
             weeklyEntriesMap[employee.id] = [];
             monthlyEntriesMap[employee.id] = [];
           }
@@ -208,7 +256,6 @@ export default function Command(): JSX.Element {
 
         setWeeklyEntries(weeklyEntriesMap);
         setMonthlyEntries(monthlyEntriesMap);
-
         setIsLoading(false);
       } catch (error) {
         await showToast({
@@ -227,17 +274,16 @@ export default function Command(): JSX.Element {
 
     async function updateActiveStatus() {
       try {
-        const clockify = ClockifyService.getInstance();
         const updatedEmployees = await Promise.all(
           employees.map(async (emp) => {
             try {
-              const activeEntry = await clockify.getActiveTimeEntry(emp.id);
+              const activeEntry = await supabaseClient.getActiveTimeEntry(emp.id);
               return { ...emp, isActive: activeEntry !== null };
             } catch (error) {
               console.error(`Error checking status for ${emp.name}:`, error);
               return emp;
             }
-          }),
+          })
         );
         setEmployees(updatedEmployees);
       } catch (error) {
@@ -252,13 +298,13 @@ export default function Command(): JSX.Element {
     const intervalId = setInterval(updateActiveStatus, 30000); // Check every 30 seconds
 
     return () => clearInterval(intervalId);
-  }, [employees.length]); // Only re-run if number of employees changes
+  }, [employees.length]);
 
   function handleEmployeeUpdate(updatedEmployee: Employee) {
     setEmployees((current) =>
       current.map((emp) =>
-        emp.id === updatedEmployee.id ? updatedEmployee : emp,
-      ),
+        emp.id === updatedEmployee.id ? updatedEmployee : emp
+      )
     );
   }
 
@@ -286,13 +332,13 @@ export default function Command(): JSX.Element {
       {isLoading ? (
         <List.EmptyView
           title="Loading Employees"
-          description="Fetching data from Clockify..."
+          description="Fetching data from database..."
           icon={Icon.Clock}
         />
       ) : employees.length === 0 ? (
         <List.EmptyView
           title="No Employees Found"
-          description="Could not find any employees in your Clockify workspace."
+          description="Could not find any employees in the database."
           icon={Icon.Person}
         />
       ) : (
@@ -320,17 +366,13 @@ export default function Command(): JSX.Element {
                 subtitle={employee.group || "No Group"}
                 icon={{
                   source: employee.isActive ? Icon.CircleFilled : Icon.Circle,
-                  tintColor: employee.isActive
-                    ? Color.Green
-                    : Color.SecondaryText,
+                  tintColor: employee.isActive ? Color.Green : Color.SecondaryText,
                 }}
                 accessories={[
                   {
                     tag: {
                       value: employee.isActive ? "Active" : "Inactive",
-                      color: employee.isActive
-                        ? Color.Green
-                        : Color.SecondaryText,
+                      color: employee.isActive ? Color.Green : Color.SecondaryText,
                     },
                   },
                   {
