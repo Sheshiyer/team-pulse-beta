@@ -1,7 +1,8 @@
 import { Database } from "../lib/supabase/types";
 import { TimeEntry } from "./clockify";
 
-export type SupabaseTimeEntry = Database["public"]["Tables"]["time_entries"]["Row"];
+export type SupabaseTimeEntry =
+  Database["public"]["Tables"]["time_entries"]["Row"];
 export type SupabaseEmployee = Database["public"]["Tables"]["employees"]["Row"];
 
 export function adaptTimeEntry(entry: SupabaseTimeEntry): TimeEntry {

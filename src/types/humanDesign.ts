@@ -5,8 +5,8 @@ export interface Location {
 }
 
 export interface BirthData {
-  date: string;    // YYYY-MM-DD
-  time: string;    // HH:mm:ss
+  date: string; // YYYY-MM-DD
+  time: string; // HH:mm:ss
   location: Location;
 }
 

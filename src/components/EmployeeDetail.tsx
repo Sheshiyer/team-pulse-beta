@@ -38,16 +38,20 @@ export function EmployeeDetail({ employee }: Props) {
   // Update currentEmployee when prop changes
   useEffect(() => {
     setCurrentEmployee(employee);
-    
+
     // Load HD profile if available
     async function loadHDProfile() {
       if (employee.customDetails?.humanDesignType) {
         try {
           const hdService = HumanDesignService.getInstance();
-          if (!employee.customDetails.dateOfBirth || !employee.customDetails.timeOfBirth || !employee.customDetails.location) {
+          if (
+            !employee.customDetails.dateOfBirth ||
+            !employee.customDetails.timeOfBirth ||
+            !employee.customDetails.location
+          ) {
             return;
           }
-          
+
           const response = await hdService.calculateProfile({
             date: employee.customDetails.dateOfBirth,
             time: `${employee.customDetails.timeOfBirth}:00`,
@@ -66,7 +70,7 @@ export function EmployeeDetail({ employee }: Props) {
         }
       }
     }
-    
+
     loadHDProfile();
   }, [employee]);
 
@@ -363,7 +367,9 @@ ${entry.description ? `📋 **Task Details**\n${entry.description}` : ""}
               <Action.Push
                 title="View Human Design Details"
                 icon={Icon.Eye}
-                target={<HumanDesign employee={currentEmployee} profile={hdProfile} />}
+                target={
+                  <HumanDesign employee={currentEmployee} profile={hdProfile} />
+                }
                 shortcut={{ modifiers: ["cmd", "shift"], key: "h" }}
               />
             )}

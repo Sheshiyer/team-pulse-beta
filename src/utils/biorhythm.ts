@@ -57,7 +57,10 @@ export function getRecommendedMonthlyHours(): number {
 }
 
 export function calculateTotalDuration(
-  timeEntries: Array<{ timeInterval?: { duration: string }, duration?: string }>,
+  timeEntries: Array<{
+    timeInterval?: { duration: string };
+    duration?: string;
+  }>,
 ): number {
   return timeEntries.reduce((total, entry) => {
     // Handle Supabase format (direct duration string)
@@ -85,12 +88,14 @@ export function calculateTotalDuration(
         // Handle "PT1H30M" format
         if (entry.timeInterval.duration.startsWith("PT")) {
           const hours = entry.timeInterval.duration.match(/(\d+)H/)?.[1] || "0";
-          const minutes = entry.timeInterval.duration.match(/(\d+)M/)?.[1] || "0";
+          const minutes =
+            entry.timeInterval.duration.match(/(\d+)M/)?.[1] || "0";
           return total + (parseInt(hours) * 60 + parseInt(minutes));
         }
 
         // Handle "HH:mm:ss" format
-        const [hours = "0", minutes = "0"] = entry.timeInterval.duration.split(":");
+        const [hours = "0", minutes = "0"] =
+          entry.timeInterval.duration.split(":");
         return total + (parseInt(hours) * 60 + parseInt(minutes));
       } catch (error) {
         console.error("Error parsing duration:", error);

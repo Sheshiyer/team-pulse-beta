@@ -1,7 +1,7 @@
-import { ClockifyService } from './clockify';
-import { SupabaseService } from './supabase';
-import { TimeEntry } from '../types/clockify';
-import * as supabaseClient from '../lib/supabase/client';
+import { ClockifyService } from "./clockify";
+import { SupabaseService } from "./supabase";
+import { TimeEntry } from "../types/clockify";
+import * as supabaseClient from "../lib/supabase/client";
 
 export class TimeEntriesService {
   private static instance: TimeEntriesService;
@@ -20,25 +20,32 @@ export class TimeEntriesService {
     return TimeEntriesService.instance;
   }
 
-  async syncTimeEntries(employeeId: string, clockifyUserId: string): Promise<void> {
+  async syncTimeEntries(
+    employeeId: string,
+    clockifyUserId: string,
+  ): Promise<void> {
     try {
       console.log(`Syncing time entries for employee ${employeeId}`);
-      
+
       // Get time entries from Clockify
-      const timeEntries = await this.clockifyService.getWeeklyTimeEntries(clockifyUserId);
-      
+      const timeEntries =
+        await this.clockifyService.getWeeklyTimeEntries(clockifyUserId);
+
       for (const entry of timeEntries) {
         await this.upsertTimeEntry(employeeId, entry);
       }
-      
+
       console.log(`Successfully synced ${timeEntries.length} time entries`);
     } catch (error) {
-      console.error('Error syncing time entries:', error);
+      console.error("Error syncing time entries:", error);
       throw error;
     }
   }
 
-  private async upsertTimeEntry(employeeId: string, entry: TimeEntry): Promise<void> {
+  private async upsertTimeEntry(
+    employeeId: string,
+    entry: TimeEntry,
+  ): Promise<void> {
     const timeEntry = {
       employee_id: employeeId,
       clockify_entry_id: entry.id,
@@ -46,7 +53,7 @@ export class TimeEntriesService {
       start_time: entry.timeInterval.start,
       end_time: entry.timeInterval.end || null,
       duration: entry.timeInterval.duration,
-      billable: entry.billable
+      billable: entry.billable,
     };
 
     try {
@@ -60,9 +67,9 @@ export class TimeEntriesService {
   async syncAllEmployeesTimeEntries(): Promise<void> {
     try {
       const employees = await supabaseClient.getEmployees();
-      
+
       if (!employees || employees.length === 0) {
-        throw new Error('No active employees found');
+        throw new Error("No active employees found");
       }
 
       for (const employee of employees) {
@@ -71,7 +78,7 @@ export class TimeEntriesService {
         }
       }
     } catch (error) {
-      console.error('Error syncing all employees time entries:', error);
+      console.error("Error syncing all employees time entries:", error);
       throw error;
     }
   }

@@ -9,10 +9,12 @@ interface Props {
 }
 
 export function HumanDesign({ employee, profile }: Props) {
-  if (!employee.customDetails?.dateOfBirth || 
-      !employee.customDetails?.timeOfBirth || 
-      !employee.customDetails?.location || 
-      !profile) {
+  if (
+    !employee.customDetails?.dateOfBirth ||
+    !employee.customDetails?.timeOfBirth ||
+    !employee.customDetails?.location ||
+    !profile
+  ) {
     return null;
   }
 

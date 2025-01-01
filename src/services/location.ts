@@ -1,4 +1,7 @@
-import { Client, PlaceAutocompleteType } from "@googlemaps/google-maps-services-js";
+import {
+  Client,
+  PlaceAutocompleteType,
+} from "@googlemaps/google-maps-services-js";
 
 const client = new Client({});
 const API_KEY = "AIzaSyD1I3MQdhdUepi7qD5LUYYhpBc8oBJBgSk";
@@ -10,12 +13,14 @@ interface LocationDetails {
   timezone: string;
 }
 
-export async function searchLocations(query: string): Promise<{
-  formattedAddress: string;
-  latitude: number;
-  longitude: number;
-  placeId: string;
-}[]> {
+export async function searchLocations(query: string): Promise<
+  {
+    formattedAddress: string;
+    latitude: number;
+    longitude: number;
+    placeId: string;
+  }[]
+> {
   try {
     const response = await client.placeAutocomplete({
       params: {
@@ -27,26 +32,28 @@ export async function searchLocations(query: string): Promise<{
 
     if (response.data.predictions) {
       // Get details for each prediction to get coordinates
-      const detailsPromises = response.data.predictions.map(async (prediction) => {
-        const details = await client.placeDetails({
-          params: {
-            place_id: prediction.place_id,
-            key: API_KEY,
-          },
-        });
+      const detailsPromises = response.data.predictions.map(
+        async (prediction) => {
+          const details = await client.placeDetails({
+            params: {
+              place_id: prediction.place_id,
+              key: API_KEY,
+            },
+          });
 
-        const location = details.data.result.geometry?.location;
-        if (!location) {
-          throw new Error("Location not found");
-        }
+          const location = details.data.result.geometry?.location;
+          if (!location) {
+            throw new Error("Location not found");
+          }
 
-        return {
-          formattedAddress: prediction.description,
-          latitude: location.lat,
-          longitude: location.lng,
-          placeId: prediction.place_id,
-        };
-      });
+          return {
+            formattedAddress: prediction.description,
+            latitude: location.lat,
+            longitude: location.lng,
+            placeId: prediction.place_id,
+          };
+        },
+      );
 
       return await Promise.all(detailsPromises);
     }
@@ -60,7 +67,7 @@ export async function searchLocations(query: string): Promise<{
 
 export async function getLocationDetails(
   latitude: number,
-  longitude: number
+  longitude: number,
 ): Promise<LocationDetails> {
   try {
     // Get timezone

@@ -6,20 +6,23 @@ import {
   TimeEntry,
 } from "../types/clockify";
 import { SupabaseService } from "./supabase";
+import { getPreferenceValues } from "@raycast/api";
+
 let API_KEY: string;
 
 try {
-  // Try to get value from Raycast preferences
-  const raycast = require("@raycast/api");
-  const preferences = raycast.getPreferenceValues();
+  // Try to get values from Raycast preferences
+  const preferences = getPreferenceValues();
   API_KEY = preferences.clockifyApiKey;
 } catch (error) {
   // Fallback to environment variable
-  API_KEY = process.env.CLOCKIFY_API_KEY || '';
+  API_KEY = process.env.CLOCKIFY_API_KEY || "";
 }
 
 if (!API_KEY) {
-  throw new Error('Missing Clockify API key. Set CLOCKIFY_API_KEY environment variable or Raycast preference.');
+  throw new Error(
+    "Missing Clockify API key. Set CLOCKIFY_API_KEY environment variable or Raycast preference.",
+  );
 }
 const BASE_URL = "https://api.clockify.me/api/v1";
 
@@ -107,7 +110,11 @@ export class ClockifyService {
     }));
   }
 
-  async getTimeEntries(userId: string, start: string, end: string): Promise<TimeEntry[]> {
+  async getTimeEntries(
+    userId: string,
+    start: string,
+    end: string,
+  ): Promise<TimeEntry[]> {
     if (!this.workspace) {
       const workspaces = await this.getWorkspaces();
       if (!workspaces || workspaces.length === 0) {
@@ -116,13 +123,16 @@ export class ClockifyService {
       this.workspace = workspaces[0].id;
     }
 
-    const response = await api.get(`/workspaces/${this.workspace}/user/${userId}/time-entries`, {
-      params: {
-        start,
-        end,
-        hydrated: true
-      }
-    });
+    const response = await api.get(
+      `/workspaces/${this.workspace}/user/${userId}/time-entries`,
+      {
+        params: {
+          start,
+          end,
+          hydrated: true,
+        },
+      },
+    );
 
     return response.data;
   }
@@ -132,21 +142,21 @@ export class ClockifyService {
     const startOfWeek = new Date(
       now.getFullYear(),
       now.getMonth(),
-      now.getDate() - now.getDay()
+      now.getDate() - now.getDay(),
     );
     startOfWeek.setHours(0, 0, 0, 0);
 
     const endOfWeek = new Date(
       now.getFullYear(),
       now.getMonth(),
-      now.getDate() + (6 - now.getDay())
+      now.getDate() + (6 - now.getDay()),
     );
     endOfWeek.setHours(23, 59, 59, 999);
 
     return this.getTimeEntries(
       userId,
       startOfWeek.toISOString(),
-      endOfWeek.toISOString()
+      endOfWeek.toISOString(),
     );
   }
 
@@ -158,7 +168,7 @@ export class ClockifyService {
     return this.getTimeEntries(
       userId,
       startOfMonth.toISOString(),
-      endOfMonth.toISOString()
+      endOfMonth.toISOString(),
     );
   }
 
@@ -172,7 +182,9 @@ export class ClockifyService {
     }
 
     try {
-      const response = await api.get(`/workspaces/${this.workspace}/user/${userId}/time-entries/in-progress`);
+      const response = await api.get(
+        `/workspaces/${this.workspace}/user/${userId}/time-entries/in-progress`,
+      );
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {

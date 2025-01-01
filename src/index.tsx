@@ -7,7 +7,6 @@ import {
   showToast,
   Toast,
   LocalStorage,
-  getPreferenceValues,
 } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { Employee, TimeEntry } from "./types/clockify";
@@ -39,8 +38,12 @@ interface TimeEntriesCache {
 export default function Command(): JSX.Element {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [weeklyEntries, setWeeklyEntries] = useState<Record<string, TimeEntry[]>>({});
-  const [monthlyEntries, setMonthlyEntries] = useState<Record<string, TimeEntry[]>>({});
+  const [weeklyEntries, setWeeklyEntries] = useState<
+    Record<string, TimeEntry[]>
+  >({});
+  const [monthlyEntries, setMonthlyEntries] = useState<
+    Record<string, TimeEntry[]>
+  >({});
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Cache helper functions
@@ -66,16 +69,25 @@ export default function Command(): JSX.Element {
   }
 
   // Function to get time entries for a date range
-  async function getTimeEntriesForRange(employeeId: string, startDate: string, endDate: string, type: 'weekly' | 'monthly') {
+  async function getTimeEntriesForRange(
+    employeeId: string,
+    startDate: string,
+    endDate: string,
+    type: "weekly" | "monthly",
+  ) {
     const cacheKey = "time_entries_cache";
     const cached = await getCachedData<TimeEntriesCache>(cacheKey);
-    
+
     if (cached && cached[employeeId] && cached[employeeId][type]) {
       return cached[employeeId][type];
     }
 
-    const entries = await supabaseClient.getTimeEntriesForEmployee(employeeId, startDate, endDate);
-    
+    const entries = await supabaseClient.getTimeEntriesForEmployee(
+      employeeId,
+      startDate,
+      endDate,
+    );
+
     // Update cache
     const newCache: TimeEntriesCache = cached || {};
     if (!newCache[employeeId]) {
@@ -83,7 +95,7 @@ export default function Command(): JSX.Element {
     }
     newCache[employeeId][type] = entries;
     await setCachedData(cacheKey, newCache);
-    
+
     return entries;
   }
 
@@ -91,10 +103,10 @@ export default function Command(): JSX.Element {
   async function handleRefresh() {
     try {
       setIsLoading(true);
-      
+
       // Clear time entries cache
       await LocalStorage.removeItem("time_entries_cache");
-      
+
       // Reset states
       setWeeklyEntries({});
       setMonthlyEntries({});
@@ -123,7 +135,7 @@ export default function Command(): JSX.Element {
             weeklyLogs: [],
             customDetails: storedEmployeeDetails,
           };
-        })
+        }),
       );
 
       setEmployees(mappedEmployees);
@@ -143,13 +155,13 @@ export default function Command(): JSX.Element {
               employee.id,
               weekStart.toISOString(),
               new Date().toISOString(),
-              'weekly'
+              "weekly",
             ),
             getTimeEntriesForRange(
               employee.id,
               monthStart.toISOString(),
               new Date().toISOString(),
-              'monthly'
+              "monthly",
             ),
           ]);
           weeklyEntriesMap[employee.id] = weekly;
@@ -214,7 +226,7 @@ export default function Command(): JSX.Element {
               weeklyLogs: [],
               customDetails: storedEmployeeDetails,
             };
-          })
+          }),
         );
 
         // Cache the employees data
@@ -236,19 +248,22 @@ export default function Command(): JSX.Element {
                 employee.id,
                 weekStart.toISOString(),
                 new Date().toISOString(),
-                'weekly'
+                "weekly",
               ),
               getTimeEntriesForRange(
                 employee.id,
                 monthStart.toISOString(),
                 new Date().toISOString(),
-                'monthly'
+                "monthly",
               ),
             ]);
             weeklyEntriesMap[employee.id] = weekly;
             monthlyEntriesMap[employee.id] = monthly;
           } catch (error) {
-            console.error(`Error fetching entries for ${employee.name}:`, error);
+            console.error(
+              `Error fetching entries for ${employee.name}:`,
+              error,
+            );
             weeklyEntriesMap[employee.id] = [];
             monthlyEntriesMap[employee.id] = [];
           }
@@ -277,13 +292,15 @@ export default function Command(): JSX.Element {
         const updatedEmployees = await Promise.all(
           employees.map(async (emp) => {
             try {
-              const activeEntry = await supabaseClient.getActiveTimeEntry(emp.id);
+              const activeEntry = await supabaseClient.getActiveTimeEntry(
+                emp.id,
+              );
               return { ...emp, isActive: activeEntry !== null };
             } catch (error) {
               console.error(`Error checking status for ${emp.name}:`, error);
               return emp;
             }
-          })
+          }),
         );
         setEmployees(updatedEmployees);
       } catch (error) {
@@ -303,8 +320,8 @@ export default function Command(): JSX.Element {
   function handleEmployeeUpdate(updatedEmployee: Employee) {
     setEmployees((current) =>
       current.map((emp) =>
-        emp.id === updatedEmployee.id ? updatedEmployee : emp
-      )
+        emp.id === updatedEmployee.id ? updatedEmployee : emp,
+      ),
     );
   }
 
@@ -366,13 +383,17 @@ export default function Command(): JSX.Element {
                 subtitle={employee.group || "No Group"}
                 icon={{
                   source: employee.isActive ? Icon.CircleFilled : Icon.Circle,
-                  tintColor: employee.isActive ? Color.Green : Color.SecondaryText,
+                  tintColor: employee.isActive
+                    ? Color.Green
+                    : Color.SecondaryText,
                 }}
                 accessories={[
                   {
                     tag: {
                       value: employee.isActive ? "Active" : "Inactive",
-                      color: employee.isActive ? Color.Green : Color.SecondaryText,
+                      color: employee.isActive
+                        ? Color.Green
+                        : Color.SecondaryText,
                     },
                   },
                   {
@@ -398,10 +419,14 @@ export default function Command(): JSX.Element {
                               style: Toast.Style.Animated,
                               title: "Syncing time entries...",
                             });
-                            
-                            const timeEntriesService = TimeEntriesService.getInstance();
-                            await timeEntriesService.syncTimeEntries(employee.id, employee.id);
-                            
+
+                            const timeEntriesService =
+                              TimeEntriesService.getInstance();
+                            await timeEntriesService.syncTimeEntries(
+                              employee.id,
+                              employee.id,
+                            );
+
                             await showToast({
                               style: Toast.Style.Success,
                               title: "Time entries synced successfully",
@@ -410,7 +435,10 @@ export default function Command(): JSX.Element {
                             await showToast({
                               style: Toast.Style.Failure,
                               title: "Failed to sync time entries",
-                              message: error instanceof Error ? error.message : "Unknown error",
+                              message:
+                                error instanceof Error
+                                  ? error.message
+                                  : "Unknown error",
                             });
                           }
                         }}

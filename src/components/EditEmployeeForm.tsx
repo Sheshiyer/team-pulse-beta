@@ -34,26 +34,29 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
   const [formValues, setFormValues] = useState<Form.Values>({
     dateOfBirth: employee.customDetails?.dateOfBirth,
     timeOfBirth: employee.customDetails?.timeOfBirth,
-    location: employee.customDetails?.location ? 
-      `${employee.customDetails.location.latitude},${employee.customDetails.location.longitude}` : undefined
+    location: employee.customDetails?.location
+      ? `${employee.customDetails.location.latitude},${employee.customDetails.location.longitude}`
+      : undefined,
   });
-  
-  const { data: locationSuggestions, isLoading: isLoadingLocations } = useCachedPromise(
-    async (query: string) => {
-      if (query.length < 3) return [];
-      return searchLocations(query);
-    },
-    [locationQuery],
-    {
-      execute: locationQuery.length >= 3,
-    }
-  );
+
+  const { data: locationSuggestions, isLoading: isLoadingLocations } =
+    useCachedPromise(
+      async (query: string) => {
+        if (query.length < 3) return [];
+        return searchLocations(query);
+      },
+      [locationQuery],
+      {
+        execute: locationQuery.length >= 3,
+      },
+    );
 
   const calculateHumanDesign = async (values: Form.Values) => {
     try {
       const loadingToast = await showToast({
         style: Toast.Style.Animated,
-        title: mindfulMessages[Math.floor(Math.random() * mindfulMessages.length)],
+        title:
+          mindfulMessages[Math.floor(Math.random() * mindfulMessages.length)],
       });
 
       if (!values.dateOfBirth || !values.timeOfBirth || !values.location) {
@@ -70,7 +73,7 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
 
       const [hours, minutes] = (values.timeOfBirth as string).split(":");
       const time = `${hours}:${minutes}:00`;
-      
+
       const response = await hdService.calculateProfile({
         date: values.dateOfBirth as string,
         time,
@@ -82,7 +85,9 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
       });
 
       if (!response.success || !response.profile) {
-        throw new Error(response.error || "Failed to calculate Human Design profile");
+        throw new Error(
+          response.error || "Failed to calculate Human Design profile",
+        );
       }
 
       loadingToast.hide();
@@ -98,7 +103,10 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Calculation Error",
-        message: error instanceof Error ? error.message : "Failed to calculate profile",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to calculate profile",
       });
       return null;
     }
@@ -112,15 +120,17 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
         if (!dateRegex.test(values.dateOfBirth as string)) {
           throw new Error("Date must be in YYYY-MM-DD format");
         }
-        
-        const [year, month, day] = (values.dateOfBirth as string).split("-").map(Number);
+
+        const [year, month, day] = (values.dateOfBirth as string)
+          .split("-")
+          .map(Number);
         const birthDate = new Date(year, month - 1, day);
-        
+
         // Check if date is valid
         if (isNaN(birthDate.getTime())) {
           throw new Error("Invalid date");
         }
-        
+
         // Check if date is in the past
         if (birthDate > new Date()) {
           throw new Error("Date of birth cannot be in the future");
@@ -212,13 +222,18 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
               icon={Icon.Stars}
               shortcut={{ modifiers: ["cmd"], key: "h" }}
               onAction={async () => {
-                if (formValues.dateOfBirth && formValues.timeOfBirth && formValues.location) {
+                if (
+                  formValues.dateOfBirth &&
+                  formValues.timeOfBirth &&
+                  formValues.location
+                ) {
                   await calculateHumanDesign(formValues);
                 } else {
                   await showToast({
                     style: Toast.Style.Failure,
                     title: "Missing Required Fields",
-                    message: "Please fill in Date of Birth, Time of Birth, and Location",
+                    message:
+                      "Please fill in Date of Birth, Time of Birth, and Location",
                   });
                 }
               }}
@@ -258,14 +273,18 @@ export function EditEmployeeForm({ employee, onSave }: Props) {
       </Form.Dropdown>
       <Form.TextField
         id="dateOfBirth"
-        onChange={(value) => setFormValues(prev => ({ ...prev, dateOfBirth: value }))}
+        onChange={(value) =>
+          setFormValues((prev) => ({ ...prev, dateOfBirth: value }))
+        }
         title="Date of Birth"
         defaultValue={employee.customDetails?.dateOfBirth}
         placeholder="YYYY-MM-DD"
       />
       <Form.TextField
         id="timeOfBirth"
-        onChange={(value) => setFormValues(prev => ({ ...prev, timeOfBirth: value }))}
+        onChange={(value) =>
+          setFormValues((prev) => ({ ...prev, timeOfBirth: value }))
+        }
         title="Time of Birth"
         defaultValue={employee.customDetails?.timeOfBirth}
         placeholder="HH:mm (e.g., 09:30)"
